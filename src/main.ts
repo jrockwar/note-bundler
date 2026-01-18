@@ -30,6 +30,7 @@ interface NoteBundlerSettings {
   defaultOutputPath: string;
   autoExportEnabled: boolean;
   filters: FilterDefinition[];
+  autoExportFrequencyMinutes: number;
 }
 
 const DEFAULT_SETTINGS: NoteBundlerSettings = {
@@ -38,14 +39,18 @@ const DEFAULT_SETTINGS: NoteBundlerSettings = {
   defaultOutputPath: "",
   autoExportEnabled: false,
   filters: [],
+  autoExportFrequencyMinutes: 60,
 };
 
 export default class NoteBundlerPlugin extends Plugin {
   settings: NoteBundlerSettings = DEFAULT_SETTINGS;
+  private autoExportIntervalId: number | null = null;
 
   async onload() {
     console.log("Note Bundler: loading");
     await this.loadSettings();
+
+    await this.updateAutoExportSchedule();
 
     this.addSettingTab(new NoteBundlerSettingTab(this.app, this));
 
@@ -63,6 +68,7 @@ export default class NoteBundlerPlugin extends Plugin {
   }
 
   onunload() {
+    this.clearAutoExportSchedule();
     console.log("Note Bundler: unloaded");
   }
 
@@ -73,6 +79,29 @@ export default class NoteBundlerPlugin extends Plugin {
 
   async saveSettings() {
     await this.saveData(this.settings);
+  }
+
+  private clearAutoExportSchedule() {
+    if (this.autoExportIntervalId !== null) {
+      window.clearInterval(this.autoExportIntervalId);
+      this.autoExportIntervalId = null;
+    }
+  }
+
+  private async updateAutoExportSchedule() {
+    this.clearAutoExportSchedule();
+    if (!this.settings.autoExportEnabled) {
+      return;
+    }
+
+    const intervalMs = Math.max(1, this.settings.autoExportFrequencyMinutes) * 60 * 1000;
+    const lastRun = this.settings.lastRun ? Date.parse(this.settings.lastRun) : null;
+    if (!lastRun || Number.isNaN(lastRun) || Date.now() - lastRun >= intervalMs) {
+      await this.exportAllFilters();
+    }
+    this.autoExportIntervalId = window.setInterval(() => {
+      void this.exportAllFilters();
+    }, intervalMs);
   }
 
   async exportAllBundles() {
@@ -172,6 +201,9 @@ export default class NoteBundlerPlugin extends Plugin {
       await fs.promises.writeFile(outputPath, output, "utf8");
     }
 
+    this.settings.lastRun = new Date().toISOString();
+    await this.saveSettings();
+
     new Notice("Note Bundler: filters exported.");
   }
 }
@@ -264,6 +296,27 @@ class NoteBundlerSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.autoExportEnabled = value;
             await this.plugin.saveSettings();
+            void this.plugin.updateAutoExportSchedule();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Auto-export frequency")
+      .setDesc("How often filters are exported when auto-export is enabled.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("1", "Every minute")
+          .addOption("5", "Every 5 minutes")
+          .addOption("15", "Every 15 minutes")
+          .addOption("30", "Every 30 minutes")
+          .addOption("60", "Every hour")
+          .addOption("240", "Every 4 hours")
+          .addOption("1440", "Every day")
+          .setValue(String(this.plugin.settings.autoExportFrequencyMinutes))
+          .onChange(async (value) => {
+            this.plugin.settings.autoExportFrequencyMinutes = Number(value);
+            await this.plugin.saveSettings();
+            void this.plugin.updateAutoExportSchedule();
           })
       );
 
