@@ -1,7 +1,7 @@
 {
   "id": "note-bundler",
   "name": "Note Bundler",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "minAppVersion": "1.5.0",
   "description": "Export bundles of notes into a single markdown file for LLM/AI context.",
   "author": "Note Bundler Maintainers",

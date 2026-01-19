@@ -118,6 +118,18 @@ Plugin settings are stored per vault in:
 - **Export preferences**: Output paths and scheduling
 - **Auto-export state**: Last run timestamp for catch-up logic
 
+### Device-Specific Settings
+
+**Multi-Device Support**: Each device maintains completely separate plugin settings automatically.
+
+**Perfect for:**
+- **Work vs Home computers**: Different export folders and schedules
+- **Desktop + Mobile**: Independent configurations per platform
+- **Multiple vaults**: Same device, different vault settings
+- **No sync conflicts**: Settings remain independent regardless of Obsidian sync
+
+**Zero Configuration**: Device isolation happens automatically - no setup required. Simply configure the plugin normally on each device and enjoy independent settings.
+
 ## Development
 
 ### Build Commands

@@ -79,11 +79,27 @@ export default class NoteBundlerPlugin extends Plugin {
 
   async loadSettings() {
     const data = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, data);
+    const deviceId = this.getDeviceId();
+    const deviceData = data[deviceId] || data; // Fallback to old format
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, deviceData);
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    const currentData = await this.loadData() || {};
+    const deviceId = this.getDeviceId();
+    currentData[deviceId] = this.settings;
+    await this.saveData(currentData);
+  }
+
+  private getDeviceId(): string {
+    // Create a unique device identifier using available platform info
+    const platform = Platform.isMobile ? 'mobile' : 'desktop';
+    const userAgent = navigator.userAgent || '';
+    const timestamp = this.app.vault.adapter.basePath || '';
+    
+    // Create a simple hash from device-specific info
+    const deviceString = `${platform}-${userAgent}-${timestamp}`;
+    return btoa(deviceString).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
   }
 
   private clearAutoExportSchedule() {
