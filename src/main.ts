@@ -127,6 +127,12 @@ export default class NoteBundlerPlugin extends Plugin {
       return false;
     }
 
+    // Exclude our own export files to prevent infinite loops
+    const fileName = filePath.split("/").pop() || "";
+    if (fileName.startsWith("note-bundler-export-") && fileName.endsWith(".md")) {
+      return false;
+    }
+
     const cache = this.app.metadataCache.getCache(filePath);
     const frontmatterTags = cache?.frontmatter?.tags;
     const frontmatterList = Array.isArray(frontmatterTags)
