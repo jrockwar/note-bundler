@@ -458,8 +458,29 @@ class NoteBundlerSettingTab extends PluginSettingTab {
       rulesContainer.createEl("div", { text: "Rules", cls: "note-bundler-filter-rules-title" });
 
       filter.rules.forEach((rule, index) => {
-        const ruleSetting = new Setting(rulesContainer)
-          .setName(`Rule ${index + 1}`)
+        const ruleSetting = new Setting(rulesContainer);
+        
+        // Add operator dropdown before the rule for rules after the first one
+        if (index > 0) {
+          ruleSetting
+            .setName(`Rule ${index + 1}`)
+            .addDropdown((dropdown) =>
+              dropdown
+                .addOption("AND", "AND")
+                .addOption("OR", "OR")
+                .setValue(rule.operator)
+                .onChange(async (value) => {
+                  rule.operator = value as FilterOperator;
+                  await this.plugin.saveSettings();
+                })
+            );
+        } else {
+          // First rule defaults to AND, but we still need to set it
+          rule.operator = rule.operator || "AND";
+          ruleSetting.setName(`Rule ${index + 1}`);
+        }
+        
+        ruleSetting
           .addDropdown((dropdown) =>
             dropdown
               .addOptions(ruleTypeOptions)
@@ -477,33 +498,15 @@ class NoteBundlerSettingTab extends PluginSettingTab {
                 rule.value = value;
                 await this.plugin.saveSettings();
               })
-          );
-        
-        // Add operator dropdown for rules after the first one
-        if (index > 0) {
-          ruleSetting.addDropdown((dropdown) =>
-            dropdown
-              .addOption("AND", "AND")
-              .addOption("OR", "OR")
-              .setValue(rule.operator)
-              .onChange(async (value) => {
-                rule.operator = value as FilterOperator;
-                await this.plugin.saveSettings();
-              })
-          );
-        } else {
-          // First rule defaults to AND, but we still need to set it
-          rule.operator = rule.operator || "AND";
-        }
-        
-        ruleSetting.addButton((button) => {
-          button.setButtonText("Remove");
-          button.onClick(async () => {
-            filter.rules = filter.rules.filter((item) => item.id !== rule.id);
-            await this.plugin.saveSettings();
-            this.display();
+          )
+          .addButton((button) => {
+            button.setButtonText("Remove");
+            button.onClick(async () => {
+              filter.rules = filter.rules.filter((item) => item.id !== rule.id);
+              await this.plugin.saveSettings();
+              this.display();
+            });
           });
-        });
       });
 
       const addRuleSetting = new Setting(rulesContainer)
