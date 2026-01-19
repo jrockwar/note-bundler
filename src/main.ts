@@ -15,12 +15,12 @@ interface FilterRule {
   id: string;
   type: FilterRuleType;
   value: string;
+  operator: FilterOperator;
 }
 
 interface FilterDefinition {
   id: string;
   name: string;
-  operator: FilterOperator;
   rules: FilterRule[];
 }
 
@@ -31,6 +31,7 @@ interface NoteBundlerSettings {
   autoExportEnabled: boolean;
   filters: FilterDefinition[];
   autoExportFrequencyMinutes: number;
+  silentMode: boolean;
 }
 
 const DEFAULT_SETTINGS: NoteBundlerSettings = {
@@ -40,6 +41,7 @@ const DEFAULT_SETTINGS: NoteBundlerSettings = {
   autoExportEnabled: false,
   filters: [],
   autoExportFrequencyMinutes: 60,
+  silentMode: false,
 };
 
 export default class NoteBundlerPlugin extends Plugin {
@@ -49,6 +51,9 @@ export default class NoteBundlerPlugin extends Plugin {
   async onload() {
     console.log("Note Bundler: loading");
     await this.loadSettings();
+    
+    // Migrate old filter structure to new per-rule operators
+    this.migrateFilterStructure();
 
     await this.updateAutoExportSchedule();
 
@@ -118,6 +123,10 @@ export default class NoteBundlerPlugin extends Plugin {
   }
 
   private matchesFilter(filePath: string, filter: FilterDefinition): boolean {
+    if (filter.rules.length === 0) {
+      return false;
+    }
+
     const cache = this.app.metadataCache.getCache(filePath);
     const frontmatterTags = cache?.frontmatter?.tags;
     const frontmatterList = Array.isArray(frontmatterTags)
@@ -131,29 +140,81 @@ export default class NoteBundlerPlugin extends Plugin {
     ];
     const normalizedTags = tagValues.map((tag) => tag.replace(/^#/, "").toLowerCase());
 
-    const ruleMatches = filter.rules.map((rule) => {
-      if (!rule.value) {
-        return false;
+    // Evaluate rules sequentially using per-rule operators
+    let result = this.evaluateRule(filter.rules[0], tagValues, normalizedTags);
+    
+    for (let i = 1; i < filter.rules.length; i++) {
+      const ruleResult = this.evaluateRule(filter.rules[i], tagValues, normalizedTags);
+      const operator = filter.rules[i].operator;
+      
+      if (operator === "AND") {
+        result = result && ruleResult;
+      } else {
+        result = result || ruleResult;
       }
-      let regex: RegExp | null = null;
-      try {
-        regex = new RegExp(rule.value, "i");
-      } catch (error) {
-        return false;
-      }
-
-      const tagHit = tagValues.some((tag) => regex?.test(tag))
-        || normalizedTags.some((tag) => regex?.test(tag));
-      if (rule.type === "tagRegexExclude") {
-        return !tagHit;
-      }
-      return tagHit;
-    });
-
-    if (filter.operator === "AND") {
-      return ruleMatches.length > 0 && ruleMatches.every(Boolean);
     }
-    return ruleMatches.some(Boolean);
+    
+    return result;
+  }
+
+  private evaluateRule(rule: FilterRule, tagValues: string[], normalizedTags: string[]): boolean {
+    if (!rule.value) {
+      return false;
+    }
+    let regex: RegExp | null = null;
+    try {
+      regex = new RegExp(rule.value, "i");
+    } catch (error) {
+      return false;
+    }
+
+    const tagHit = tagValues.some((tag) => regex?.test(tag))
+      || normalizedTags.some((tag) => regex?.test(tag));
+    
+    if (rule.type === "tagRegexExclude") {
+      return !tagHit;
+    }
+    return tagHit;
+  }
+
+  private migrateFilterStructure() {
+    let needsSave = false;
+    
+    this.settings.filters.forEach((filter) => {
+      // Check if filter has old operator property (indicating old structure)
+      if ('operator' in filter) {
+        const oldFilter = filter as any;
+        
+        // Move operator to first rule if rules exist
+        if (oldFilter.rules && oldFilter.rules.length > 0) {
+          oldFilter.rules.forEach((rule: any, index: number) => {
+            if (index === 0) {
+              // First rule gets the filter's operator, defaults to AND
+              rule.operator = oldFilter.operator || "AND";
+            } else {
+              // Subsequent rules default to AND
+              rule.operator = rule.operator || "AND";
+            }
+          });
+        }
+        
+        // Remove operator from filter
+        delete (filter as any).operator;
+        needsSave = true;
+      } else {
+        // Ensure all rules have operators (for safety)
+        filter.rules.forEach((rule, index) => {
+          if (!rule.operator) {
+            rule.operator = index === 0 ? "AND" : "AND";
+            needsSave = true;
+          }
+        });
+      }
+    });
+    
+    if (needsSave) {
+      this.saveSettings();
+    }
   }
 
   async exportAllFilters() {
@@ -167,15 +228,15 @@ export default class NoteBundlerPlugin extends Plugin {
       return;
     }
 
-    const windowRequire = (window as unknown as { require?: (module: string) => any }).require;
-    const fs = windowRequire?.("fs");
-    const path = windowRequire?.("path");
-    if (!fs || !path) {
-      new Notice("File system access is unavailable in this environment.");
+    // Ensure output directory exists using Obsidian's Vault API
+    try {
+      if (!await this.app.vault.adapter.exists(this.settings.defaultOutputPath)) {
+        await this.app.vault.adapter.mkdir(this.settings.defaultOutputPath);
+      }
+    } catch (error) {
+      new Notice("Failed to create output directory. Check path permissions.");
       return;
     }
-
-    await fs.promises.mkdir(this.settings.defaultOutputPath, { recursive: true });
 
     const files = this.app.vault.getMarkdownFiles();
     for (const filter of this.settings.filters) {
@@ -197,14 +258,22 @@ export default class NoteBundlerPlugin extends Plugin {
 
       const output = combinedParts.join("\n\n");
       const filename = `note-bundler-export-${this.sanitizeFilename(filter.name)}.md`;
-      const outputPath = path.join(this.settings.defaultOutputPath, filename);
-      await fs.promises.writeFile(outputPath, output, "utf8");
+      const outputPath = `${this.settings.defaultOutputPath}/${filename}`;
+      
+      try {
+        await this.app.vault.adapter.write(outputPath, output);
+      } catch (error) {
+        new Notice(`Failed to write export file: ${filename}`);
+        console.error("Note Bundler export error:", error);
+      }
     }
 
     this.settings.lastRun = new Date().toISOString();
     await this.saveSettings();
 
-    new Notice("Note Bundler: filters exported.");
+    if (!this.settings.silentMode) {
+      new Notice("Note Bundler: filters exported.");
+    }
   }
 }
 
@@ -218,7 +287,6 @@ class NoteBundlerSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
-    const isDesktop = Platform.isDesktopApp;
     const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const ruleTypeOptions: Record<FilterRuleType, string> = {
       tagRegexInclude: "Match tags by regex",
@@ -232,60 +300,18 @@ class NoteBundlerSettingTab extends PluginSettingTab {
     const outputPathSetting = new Setting(containerEl)
       .setName("Default output folder")
       .setDesc(
-        isDesktop
-          ? "Absolute path to export bundles (external folders supported)."
-          : "Absolute path to export bundles. Note: mobile platforms may restrict access to external folders."
+        "Vault-relative path to export bundles (e.g., 'Exports/' or 'docs/bundles/')."
       )
       .addText((text) => {
         outputPathInput = text;
         text
-          .setPlaceholder("/Users/you/Exports")
+          .setPlaceholder("Exports/")
           .setValue(this.plugin.settings.defaultOutputPath)
           .onChange(async (value) => {
             this.plugin.settings.defaultOutputPath = value.trim();
             await this.plugin.saveSettings();
           });
       });
-
-    outputPathSetting.addButton((button) => {
-      button.setButtonText("Choose folder");
-      if (!isDesktop) {
-        button.setDisabled(true);
-        return;
-      }
-      button.onClick(async () => {
-        const windowRequire = (window as unknown as { require?: (module: string) => any }).require;
-        const electron = windowRequire?.("electron");
-        const dialog = electron?.remote?.dialog ?? electron?.dialog;
-        if (!dialog?.showOpenDialog) {
-          new Notice("Folder picker is unavailable in this environment.");
-          return;
-        }
-
-        const result = await dialog.showOpenDialog({
-          properties: ["openDirectory"],
-        });
-
-        if (result?.canceled || !result?.filePaths?.length) {
-          return;
-        }
-
-        const selectedPath = result.filePaths[0];
-        const fs = windowRequire?.("fs");
-        if (fs?.promises?.access) {
-          try {
-            await fs.promises.access(selectedPath, fs.constants?.W_OK ?? fs.constants?.F_OK);
-          } catch (error) {
-            new Notice("Selected folder is not writable. Choose another folder.");
-            return;
-          }
-        }
-
-        this.plugin.settings.defaultOutputPath = selectedPath;
-        await this.plugin.saveSettings();
-        outputPathInput?.setValue(selectedPath);
-      });
-    });
 
     new Setting(containerEl)
       .setName("Enable auto-export")
@@ -321,6 +347,18 @@ class NoteBundlerSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Silent mode")
+      .setDesc("Disable export notifications (useful for high-frequency exports).")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.silentMode)
+          .onChange(async (value) => {
+            this.plugin.settings.silentMode = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Export now")
       .setDesc("Run exports immediately to validate output.")
       .addButton((button) => {
@@ -342,7 +380,6 @@ class NoteBundlerSettingTab extends PluginSettingTab {
         this.plugin.settings.filters.push({
           id: createId(),
           name: `Filter ${nextIndex}`,
-          operator: "AND",
           rules: [],
         });
         await this.plugin.saveSettings();
@@ -398,22 +435,9 @@ class NoteBundlerSettingTab extends PluginSettingTab {
       rulesContainer.style.paddingLeft = "12px";
       rulesContainer.createEl("div", { text: "Rules", cls: "note-bundler-filter-rules-title" });
 
-      new Setting(rulesContainer)
-        .setName("Match rules with")
-        .addDropdown((dropdown) =>
-          dropdown
-            .addOption("AND", "All (AND)")
-            .addOption("OR", "Any (OR)")
-            .setValue(filter.operator)
-            .onChange(async (value) => {
-              filter.operator = value as FilterOperator;
-              await this.plugin.saveSettings();
-            })
-        );
-
-      filter.rules.forEach((rule) => {
-        new Setting(rulesContainer)
-          .setName("Rule")
+      filter.rules.forEach((rule, index) => {
+        const ruleSetting = new Setting(rulesContainer)
+          .setName(`Rule ${index + 1}`)
           .addDropdown((dropdown) =>
             dropdown
               .addOptions(ruleTypeOptions)
@@ -431,15 +455,33 @@ class NoteBundlerSettingTab extends PluginSettingTab {
                 rule.value = value;
                 await this.plugin.saveSettings();
               })
-          )
-          .addButton((button) => {
-            button.setButtonText("Remove");
-            button.onClick(async () => {
-              filter.rules = filter.rules.filter((item) => item.id !== rule.id);
-              await this.plugin.saveSettings();
-              this.display();
-            });
+          );
+        
+        // Add operator dropdown for rules after the first one
+        if (index > 0) {
+          ruleSetting.addDropdown((dropdown) =>
+            dropdown
+              .addOption("AND", "AND")
+              .addOption("OR", "OR")
+              .setValue(rule.operator)
+              .onChange(async (value) => {
+                rule.operator = value as FilterOperator;
+                await this.plugin.saveSettings();
+              })
+          );
+        } else {
+          // First rule defaults to AND, but we still need to set it
+          rule.operator = rule.operator || "AND";
+        }
+        
+        ruleSetting.addButton((button) => {
+          button.setButtonText("Remove");
+          button.onClick(async () => {
+            filter.rules = filter.rules.filter((item) => item.id !== rule.id);
+            await this.plugin.saveSettings();
+            this.display();
           });
+        });
       });
 
       const addRuleSetting = new Setting(rulesContainer)
@@ -452,6 +494,7 @@ class NoteBundlerSettingTab extends PluginSettingTab {
             id: createId(),
             type: "tagRegexInclude",
             value: "",
+            operator: "AND",
           });
           await this.plugin.saveSettings();
           this.display();

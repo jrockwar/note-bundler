@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.0.3 - 2026-01-19
+- **UX Improvement**: Moved AND/OR operators from filter-level to rule-level, enabling complex rule combinations (e.g., "Rule 1 AND Rule 2 OR Rule 3").
+- **Silent Mode**: Added toggle to disable export notifications for high-frequency exports (1-minute intervals).
+- **Code Cleanup**: Removed unused folder picker and Electron API dependencies for cleaner cross-platform support.
+- **Documentation**: Enhanced README with comprehensive installation guide, usage examples, and troubleshooting section.
+- **Migration**: Automatic migration of existing filters to new per-rule operator structure.
+- **Stability**: Improved filter evaluation logic with sequential rule processing.
+
 ## 0.0.2 - 2026-01-18
 - Added filter builder UI with AND/OR operators and tag regex rules.
 - Added per-filter export with timestamp header, filename sorting, and frontmatter title fallback.
