@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.6 - 2026-01-19
+- **UX Improvement**: AND/OR operators now appear before rules (instead of after) for better readability.
+- **Documentation**: Streamlined README - removed verbose sections and condensed content by ~53%.
+- **License**: Added GPL-3.0 license to prevent proprietary commercialization while allowing forks.
+
 ## 0.0.5 - 2026-01-19
 - **Device-Specific Settings**: Each device now maintains completely separate plugin settings using unique device identifiers.
 - **Multi-Computer Support**: Perfect for users with work laptops, home desktops, and mobile devices - each can have independent configurations.

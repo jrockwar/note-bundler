@@ -1,97 +1,49 @@
 # Note Bundler
 
-Bundle notes from your Obsidian vault into organized Markdown files using flexible filters - perfect for creating LLM context, documentation exports, or curated note collections.
-
-## Overview
-
-Note Bundler helps you create targeted exports of your Obsidian notes by defining reusable filters. Each filter generates a single consolidated Markdown file containing all matching notes, making it ideal for:
-- Preparing context for AI/LLM tools
-- Creating documentation packages
-- Exporting project-specific notes
-- Building knowledge bases for sharing
+Export filtered Obsidian notes into consolidated Markdown files. Perfect for preparing LLM context, documentation packages, or curated note collections.
 
 ## Features
 
-### 🎯 **Smart Filtering**
-- **Tag-based filtering** with regex support (include/exclude patterns)
-- **Case-insensitive matching** for tags in both note content and frontmatter
-- **AND/OR logic** to combine multiple rules flexibly
-- **Extensible rule system** designed for future filter types
-
-### 📁 **Flexible Export Management**
-- **One file per filter** with sanitized, descriptive filenames
-- **Configurable output paths** - vault-relative (`Exports/`) or absolute paths
-- **Cross-platform compatibility** using Obsidian's Vault APIs
-- **Automatic filename sorting** with frontmatter title fallbacks
-
-### ⏰ **Automated Scheduling**
-- **Manual export trigger** from settings for immediate validation
-- **Scheduled auto-exports** with configurable intervals
-- **Catch-up exports** that run when Obsidian launches after missed schedules
-- **Safe defaults** to prevent overwhelming exports
-
-### 🛠️ **User-Friendly Interface**
-- **Settings-based configuration** with intuitive filter builder
-- **Real-time export validation** through settings panel
-- **Persistent filter profiles** saved per vault
+- Tag-based filtering with regex support (include/exclude patterns)
+- AND/OR logic to combine multiple rules
+- Manual and scheduled auto-exports (minute/hour/day intervals)
+- Vault-relative or absolute output paths (desktop only)
+- Cross-platform compatibility
+- Device-specific settings (independent configs per device)
 
 ## Installation
 
-### Manual Installation
-1. Clone or download this repository
-2. Install dependencies: `npm install`
-3. Build the plugin: `npm run build`
-4. Create a folder named `note-bundler` in your vault's `.obsidian/plugins/` directory
-5. Copy `main.js`, `manifest.json`, and `styles.css` (if present) into the plugin folder
-6. Enable **Note Bundler** in Obsidian → Settings → Community plugins
+1. Clone this repository
+2. `npm install && npm run build`
+3. Copy `main.js` and `manifest.json` to `.obsidian/plugins/note-bundler/` in your vault
+4. Enable in Obsidian → Settings → Community plugins
 
-### Development Installation
-For development or testing, you can symlink the repository folder into `.obsidian/plugins/note-bundler` and run `npm run dev` for live reloading.
+**Development**: Symlink the repo folder into `.obsidian/plugins/note-bundler` and run `npm run dev`.
 
-## Usage Guide
+## Usage
 
 ### 1. Configure Output Location
-Navigate to **Settings → Note Bundler → Default output folder**:
-- **Vault-relative paths**: `Exports/`, `docs/bundles/`, etc.
-- All platforms support vault-relative paths for maximum compatibility
+**Settings → Note Bundler → Default output folder**  
+Use vault-relative paths like `Exports/` or `docs/bundles/`. On desktop, you can also use absolute paths like `/Users/john-doe/Documents/NoteBundles/`.
 
-### 2. Create Export Filters
-In **Settings → Note Bundler → Filters**:
-
+### 2. Create Filters
 1. Click **Create new filter**
-2. **Name your filter** descriptively (e.g., "Project Notes", "Research Papers")
-3. **Add rules** using the available types:
-   - **Match tags by regex** - Include notes with tags matching the pattern
-   - **Don't match tags by regex** - Exclude notes with tags matching the pattern
-4. **Set rule combination**:
-   - **All (AND)** - Notes must match ALL rules to be included
-   - **Any (OR)** - Notes matching ANY rule will be included
+2. Name it (e.g., "Project Notes")
+3. Add rules:
+   - **Match tags by regex** - Include matching notes
+   - **Don't match tags by regex** - Exclude matching notes
+4. Combine rules with AND/OR operators
 
-#### Tag Regex Examples
-- `#project` - Match exact tag
-- `#project.*` - Match tags starting with #project
-- `#(important|urgent)` - Match multiple specific tags
-- `(?<!#)draft` - Match "draft" without leading # (frontmatter tags)
+**Tag regex examples:**
+- `#project` - exact tag
+- `#project.*` - tags starting with #project
+- `#(important|urgent)` - multiple tags
 
-### 3. Export Your Notes
-**Manual Export:**
-- Click **Export now** in the Note Bundler settings
-- Files are created immediately: `note-bundler-export-<filter-name>.md`
+N.B. Tags are not treated as case-sensitive (e.g., `#Project` and `#project` are the same), so you don't need to worry about case in the regex - it will pick up both.
 
-**Automatic Export:**
-- Toggle **Enable auto-export**
-- Choose your preferred frequency:
-  - Every minute
-  - Every hour  
-  - Every day
-- Exports run automatically and catch up on app launch if missed
-
-### 4. Review Exported Files
-Each export creates a structured Markdown file with:
-- **Timestamp header** showing when the export was created
-- **Individual note sections** with clear separators
-- **Note titles** extracted from frontmatter or filename
-- **Full note content** preserving formatting and links
+### 3. Export
+**Manual:** Click **Export now** in settings  
+**Auto:** Enable auto-export and choose frequency (minute/hour/day)
 
 ## Output Format
 
@@ -111,43 +63,16 @@ Project overview content with **formatting** and [[links]] preserved.
 Research findings and citations...
 ```
 
-## Configuration Storage
+## Device-Specific Settings
 
-Plugin settings are stored per vault in:
-- **Filter definitions**: Name, rules, and logic operators
-- **Export preferences**: Output paths and scheduling
-- **Auto-export state**: Last run timestamp for catch-up logic
-
-### Device-Specific Settings
-
-**Multi-Device Support**: Each device maintains completely separate plugin settings automatically.
-
-**Perfect for:**
-- **Work vs Home computers**: Different export folders and schedules
-- **Desktop + Mobile**: Independent configurations per platform
-- **Multiple vaults**: Same device, different vault settings
-- **No sync conflicts**: Settings remain independent regardless of Obsidian sync
-
-**Zero Configuration**: Device isolation happens automatically - no setup required. Simply configure the plugin normally on each device and enjoy independent settings.
+Each device maintains independent plugin settings automatically - no sync conflicts. Configure different export paths and schedules per device without any setup.
 
 ## Development
 
 ### Build Commands
 ```bash
-npm run dev      # Development build with file watching
+npm run dev      # Dev build with watching
 npm run build    # Production build
-npm run version  # Bump version and update changelog
-```
-
-### Project Structure
-```
-├── src/
-│   └── main.ts          # Main plugin logic
-├── memory-bank/         # Development documentation
-├── manifest.json        # Plugin manifest
-├── package.json         # Dependencies and scripts
-├── styles.css           # Plugin styles (if any)
-└── README.md           # This file
 ```
 
 ### Architecture Notes
@@ -158,28 +83,18 @@ npm run version  # Bump version and update changelog
 
 ## Troubleshooting
 
-### Common Issues
-- **Export fails**: Check output path permissions and disk space
+- **Export fails**: Check output path permissions
 - **No notes exported**: Verify filter rules and tag spelling
-- **Auto-export not running**: Ensure plugin has necessary permissions
-- **Mobile limitations**: Use vault-relative paths on mobile devices
-
-### Debugging
-- Check Obsidian developer console for error messages
-- Verify filter rules with manual export first
-- Test with simple tag patterns before complex regex
+- **Auto-export not running**: Check plugin permissions
+- **Debugging**: Check developer console, test with simple patterns first
 
 ## Contributing
 
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes with appropriate tests
-4. Submit a pull request with clear description
+Contributions welcome! Fork, create a feature branch, and submit a PR.
 
 ## License
 
-[Add your license information here]
+GPL-3.0 - see [LICENSE](LICENSE) for details.
 
 ## Changelog
 

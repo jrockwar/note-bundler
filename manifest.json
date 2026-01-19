@@ -1,10 +1,10 @@
 {
   "id": "note-bundler",
   "name": "Note Bundler",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "minAppVersion": "1.5.0",
-  "description": "Export bundles of notes into a single markdown file for LLM/AI context.",
-  "author": "Note Bundler Maintainers",
-  "authorUrl": "https://codeberg.org",
+  "description": "Export bundles of notes into a single markdown file.",
+  "author": "José Peña",
+  "authorUrl": "https://codeberg.org/jrockwar",
   "isDesktopOnly": false
 }
