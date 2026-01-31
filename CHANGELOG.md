@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.0.7 - 2026-01-31
+- **Directory Rules**: Added include/exclude directory rules with recursive matching for vault-relative paths.
+- **UI Copy**: Renamed tag exclusion rule label to "Exclude tags matching regex" for clarity.
+- **Documentation**: Updated README to cover directory rules and new label.
+
 ## 0.0.6 - 2026-01-19
 - **UX Improvement**: AND/OR operators now appear before rules (instead of after) for better readability.
 - **Documentation**: Streamlined README - removed verbose sections and condensed content by ~53%.

@@ -5,6 +5,7 @@ Export filtered Obsidian notes into consolidated Markdown files. Perfect for pre
 ## Features
 
 - Tag-based filtering with regex support (include/exclude patterns)
+- Directory include/exclude rules (recursive, vault-relative)
 - AND/OR logic to combine multiple rules
 - Manual and scheduled auto-exports (minute/hour/day intervals)
 - Vault-relative or absolute output paths (desktop only)
@@ -31,7 +32,9 @@ Use vault-relative paths like `Exports/` or `docs/bundles/`. On desktop, you can
 2. Name it (e.g., "Project Notes")
 3. Add rules:
    - **Match tags by regex** - Include matching notes
-   - **Don't match tags by regex** - Exclude matching notes
+   - **Exclude tags matching regex** - Exclude matching notes
+   - **Include directory (recursive)** - Include notes inside a vault-relative folder
+   - **Exclude directory (recursive)** - Exclude notes inside a vault-relative folder
 4. Combine rules with AND/OR operators
 
 **Tag regex examples:**
@@ -40,6 +43,10 @@ Use vault-relative paths like `Exports/` or `docs/bundles/`. On desktop, you can
 - `#(important|urgent)` - multiple tags
 
 N.B. Tags are not treated as case-sensitive (e.g., `#Project` and `#project` are the same), so you don't need to worry about case in the regex - it will pick up both.
+
+**Directory rule examples (vault-relative):**
+- `journals/` - everything in `journals/` and subfolders
+- `Projects/ClientA` - only that subtree (case-sensitive)
 
 ### 3. Export
 **Manual:** Click **Export now** in settings  

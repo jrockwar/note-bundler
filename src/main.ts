@@ -9,7 +9,7 @@ interface BundleDefinition {
 }
 
 type FilterOperator = "AND" | "OR";
-type FilterRuleType = "tagRegexInclude" | "tagRegexExclude";
+type FilterRuleType = "tagRegexInclude" | "tagRegexExclude" | "directoryInclude" | "directoryExclude";
 
 interface FilterRule {
   id: string;
@@ -163,10 +163,10 @@ export default class NoteBundlerPlugin extends Plugin {
     const normalizedTags = tagValues.map((tag) => tag.replace(/^#/, "").toLowerCase());
 
     // Evaluate rules sequentially using per-rule operators
-    let result = this.evaluateRule(filter.rules[0], tagValues, normalizedTags);
+    let result = this.evaluateRule(filter.rules[0], filePath, tagValues, normalizedTags);
     
     for (let i = 1; i < filter.rules.length; i++) {
-      const ruleResult = this.evaluateRule(filter.rules[i], tagValues, normalizedTags);
+      const ruleResult = this.evaluateRule(filter.rules[i], filePath, tagValues, normalizedTags);
       const operator = filter.rules[i].operator;
       
       if (operator === "AND") {
@@ -179,10 +179,19 @@ export default class NoteBundlerPlugin extends Plugin {
     return result;
   }
 
-  private evaluateRule(rule: FilterRule, tagValues: string[], normalizedTags: string[]): boolean {
+  private evaluateRule(rule: FilterRule, filePath: string, tagValues: string[], normalizedTags: string[]): boolean {
     if (!rule.value) {
       return false;
     }
+    if (rule.type === "directoryInclude" || rule.type === "directoryExclude") {
+      const normalizedValue = rule.value.trim().replace(/^[\\/]+/, "").replace(/[\\/]+$/, "");
+      if (!normalizedValue) {
+        return false;
+      }
+      const directoryHit = filePath === normalizedValue || filePath.startsWith(`${normalizedValue}/`);
+      return rule.type === "directoryExclude" ? !directoryHit : directoryHit;
+    }
+
     let regex: RegExp | null = null;
     try {
       regex = new RegExp(rule.value, "i");
@@ -312,8 +321,15 @@ class NoteBundlerSettingTab extends PluginSettingTab {
     const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const ruleTypeOptions: Record<FilterRuleType, string> = {
       tagRegexInclude: "Match tags by regex",
-      tagRegexExclude: "Don't match tags by regex",
+      tagRegexExclude: "Exclude tags matching regex",
+      directoryInclude: "Include directory (recursive)",
+      directoryExclude: "Exclude directory (recursive)",
     };
+    const getRulePlaceholder = (ruleType: FilterRuleType) => (
+      ruleType === "directoryInclude" || ruleType === "directoryExclude"
+        ? "Directory path (e.g., journals/)"
+        : "Regex pattern"
+    );
 
     containerEl.empty();
     containerEl.createEl("h2", { text: "Note Bundler Settings" });
@@ -456,6 +472,10 @@ class NoteBundlerSettingTab extends PluginSettingTab {
       rulesContainer.style.borderLeft = "1px solid var(--background-modifier-border)";
       rulesContainer.style.paddingLeft = "12px";
       rulesContainer.createEl("div", { text: "Rules", cls: "note-bundler-filter-rules-title" });
+      rulesContainer.createEl("div", {
+        text: "Directory rules are vault-relative and apply recursively.",
+        cls: "note-bundler-filter-rules-help",
+      });
 
       filter.rules.forEach((rule, index) => {
         const ruleSetting = new Setting(rulesContainer);
@@ -480,6 +500,8 @@ class NoteBundlerSettingTab extends PluginSettingTab {
           ruleSetting.setName(`Rule ${index + 1}`);
         }
         
+        let ruleValueInput: { setPlaceholder: (value: string) => void } | null = null;
+
         ruleSetting
           .addDropdown((dropdown) =>
             dropdown
@@ -487,18 +509,20 @@ class NoteBundlerSettingTab extends PluginSettingTab {
               .setValue(rule.type)
               .onChange(async (value) => {
                 rule.type = value as FilterRuleType;
+                ruleValueInput?.setPlaceholder(getRulePlaceholder(rule.type));
                 await this.plugin.saveSettings();
               })
           )
-          .addText((text) =>
+          .addText((text) => {
+            ruleValueInput = text;
             text
-              .setPlaceholder("Regex pattern")
+              .setPlaceholder(getRulePlaceholder(rule.type))
               .setValue(rule.value)
               .onChange(async (value) => {
                 rule.value = value;
                 await this.plugin.saveSettings();
-              })
-          )
+              });
+          })
           .addButton((button) => {
             button.setButtonText("Remove");
             button.onClick(async () => {
