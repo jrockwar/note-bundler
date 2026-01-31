@@ -249,7 +249,8 @@ export default class NoteBundlerPlugin extends Plugin {
   }
 
   async exportAllFilters() {
-    if (!this.settings.defaultOutputPath) {
+    const outputFolder = this.settings.defaultOutputPath.replace(/[\\/]+$/, "");
+    if (!outputFolder) {
       new Notice("Set a default output folder before exporting.");
       return;
     }
@@ -261,8 +262,8 @@ export default class NoteBundlerPlugin extends Plugin {
 
     // Ensure output directory exists using Obsidian's Vault API
     try {
-      if (!await this.app.vault.adapter.exists(this.settings.defaultOutputPath)) {
-        await this.app.vault.adapter.mkdir(this.settings.defaultOutputPath);
+      if (!await this.app.vault.adapter.exists(outputFolder)) {
+        await this.app.vault.adapter.mkdir(outputFolder);
       }
     } catch (error) {
       new Notice("Failed to create output directory. Check path permissions.");
@@ -289,7 +290,7 @@ export default class NoteBundlerPlugin extends Plugin {
 
       const output = combinedParts.join("\n\n");
       const filename = `note-bundler-export-${this.sanitizeFilename(filter.name)}.md`;
-      const outputPath = `${this.settings.defaultOutputPath}/${filename}`;
+      const outputPath = `${outputFolder}/${filename}`;
       
       try {
         await this.app.vault.adapter.write(outputPath, output);

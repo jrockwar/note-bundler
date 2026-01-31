@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.0.8 - 2026-01-31
+- **Bugfix**: Normalize output folder path to avoid double slashes in export paths.
+
 ## 0.0.7 - 2026-01-31
 - **Directory Rules**: Added include/exclude directory rules with recursive matching for vault-relative paths.
 - **UI Copy**: Renamed tag exclusion rule label to "Exclude tags matching regex" for clarity.
