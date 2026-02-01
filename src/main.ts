@@ -60,7 +60,7 @@ export default class NoteBundlerPlugin extends Plugin {
     this.addSettingTab(new NoteBundlerSettingTab(this.app, this));
 
     this.addCommand({
-      id: "note-bundler-open-settings",
+      id: "open-settings",
       name: "Open Note Bundler settings",
       callback: () => {
         // Obsidian's typings omit app.setting, so we cast to reach the settings tab API.
