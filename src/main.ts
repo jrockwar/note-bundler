@@ -1,4 +1,4 @@
-import { Notice, Platform, Plugin, PluginSettingTab, Setting } from "obsidian";
+import { Notice, normalizePath, Platform, Plugin, PluginSettingTab, Setting, TFolder } from "obsidian";
 
 interface BundleDefinition {
   name: string;
@@ -49,7 +49,6 @@ export default class NoteBundlerPlugin extends Plugin {
   private autoExportIntervalId: number | null = null;
 
   async onload() {
-    console.log("Note Bundler: loading");
     await this.loadSettings();
     this.migrateFilterStructure();
 
@@ -72,7 +71,6 @@ export default class NoteBundlerPlugin extends Plugin {
 
   onunload() {
     this.clearAutoExportSchedule();
-    console.log("Note Bundler: unloaded");
   }
 
   async loadSettings() {
@@ -258,8 +256,12 @@ export default class NoteBundlerPlugin extends Plugin {
 
     // Ensure output directory exists using Obsidian's Vault API
     try {
-      if (!await this.app.vault.adapter.exists(outputFolder)) {
-        await this.app.vault.adapter.mkdir(outputFolder);
+      const existingFolder = this.app.vault.getAbstractFileByPath(outputFolder);
+      if (!existingFolder) {
+        await this.app.vault.createFolder(outputFolder);
+      } else if (!(existingFolder instanceof TFolder)) {
+        new Notice("Output path exists but is not a folder.");
+        return;
       }
     } catch (error) {
       new Notice("Failed to create output directory. Check path permissions.");
@@ -291,10 +293,20 @@ export default class NoteBundlerPlugin extends Plugin {
       const outputPath = `${outputFolder}/${filename}`;
       
       try {
-        await this.app.vault.adapter.write(outputPath, output);
-      } catch (error) {
-        new Notice(`Failed to write export file: ${filename}`);
-        console.error("Note Bundler export error:", error);
+        await this.app.vault.create(outputPath, output);
+      } catch (createError) {
+        // File might already exist, try modifying it
+        try {
+          const existingFile = this.app.vault.getAbstractFileByPath(outputPath);
+          if (existingFile) {
+            await this.app.vault.modify(existingFile as any, output);
+          } else {
+            throw createError;
+          }
+        } catch (error) {
+          new Notice(`Failed to write export file: ${filename}`);
+          console.error("Note Bundler export error:", error);
+        }
       }
     }
 
@@ -332,7 +344,6 @@ class NoteBundlerSettingTab extends PluginSettingTab {
     );
 
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Note Bundler Settings" });
 
     new Setting(containerEl)
       .setName("Default output folder")
@@ -344,7 +355,7 @@ class NoteBundlerSettingTab extends PluginSettingTab {
           .setPlaceholder("Exports/")
           .setValue(this.plugin.settings.defaultOutputPath)
           .onChange(async (value) => {
-            this.plugin.settings.defaultOutputPath = value.trim();
+            this.plugin.settings.defaultOutputPath = normalizePath(value.trim());
             await this.plugin.saveSettings();
           })
       );
@@ -405,7 +416,9 @@ class NoteBundlerSettingTab extends PluginSettingTab {
         });
       });
 
-    containerEl.createEl("h3", { text: "Filters" });
+    new Setting(containerEl)
+      .setName("Filters")
+      .setHeading();
     const addFilterSetting = new Setting(containerEl)
       .setName("Create new filter")
       .setDesc("Filters are reusable rule groups for bundles.");
@@ -466,9 +479,6 @@ class NoteBundlerSettingTab extends PluginSettingTab {
         });
 
       const rulesContainer = filterContainer.createDiv({ cls: "note-bundler-filter-rules" });
-      rulesContainer.style.marginLeft = "16px";
-      rulesContainer.style.borderLeft = "1px solid var(--background-modifier-border)";
-      rulesContainer.style.paddingLeft = "12px";
       rulesContainer.createEl("div", { text: "Rules", cls: "note-bundler-filter-rules-title" });
       rulesContainer.createEl("div", {
         text: "Directory rules are vault-relative and apply recursively.",

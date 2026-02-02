@@ -40,7 +40,6 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
     this.autoExportIntervalId = null;
   }
   async onload() {
-    console.log("Note Bundler: loading");
     await this.loadSettings();
     this.migrateFilterStructure();
     await this.updateAutoExportSchedule();
@@ -57,7 +56,6 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
   }
   onunload() {
     this.clearAutoExportSchedule();
-    console.log("Note Bundler: unloaded");
   }
   async loadSettings() {
     const data = await this.loadData();
@@ -193,8 +191,12 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
       return;
     }
     try {
-      if (!await this.app.vault.adapter.exists(outputFolder)) {
-        await this.app.vault.adapter.mkdir(outputFolder);
+      const existingFolder = this.app.vault.getAbstractFileByPath(outputFolder);
+      if (!existingFolder) {
+        await this.app.vault.createFolder(outputFolder);
+      } else if (!(existingFolder instanceof import_obsidian.TFolder)) {
+        new import_obsidian.Notice("Output path exists but is not a folder.");
+        return;
       }
     } catch (error) {
       new import_obsidian.Notice("Failed to create output directory. Check path permissions.");
@@ -222,10 +224,19 @@ ${content.trim()}`
       const filename = `note-bundler-export-${this.sanitizeFilename(filter.name)}.md`;
       const outputPath = `${outputFolder}/${filename}`;
       try {
-        await this.app.vault.adapter.write(outputPath, output);
-      } catch (error) {
-        new import_obsidian.Notice(`Failed to write export file: ${filename}`);
-        console.error("Note Bundler export error:", error);
+        await this.app.vault.create(outputPath, output);
+      } catch (createError) {
+        try {
+          const existingFile = this.app.vault.getAbstractFileByPath(outputPath);
+          if (existingFile) {
+            await this.app.vault.modify(existingFile, output);
+          } else {
+            throw createError;
+          }
+        } catch (error) {
+          new import_obsidian.Notice(`Failed to write export file: ${filename}`);
+          console.error("Note Bundler export error:", error);
+        }
       }
     }
     this.settings.lastRun = (/* @__PURE__ */ new Date()).toISOString();
@@ -251,12 +262,11 @@ var NoteBundlerSettingTab = class extends import_obsidian.PluginSettingTab {
     };
     const getRulePlaceholder = (ruleType) => ruleType === "directoryInclude" || ruleType === "directoryExclude" ? "Directory path (e.g., journals/)" : "Regex pattern";
     containerEl.empty();
-    containerEl.createEl("h2", { text: "Note Bundler Settings" });
     new import_obsidian.Setting(containerEl).setName("Default output folder").setDesc(
       "Vault-relative path to export bundles (e.g., 'Exports/' or 'docs/bundles/')."
     ).addText(
       (text) => text.setPlaceholder("Exports/").setValue(this.plugin.settings.defaultOutputPath).onChange(async (value) => {
-        this.plugin.settings.defaultOutputPath = value.trim();
+        this.plugin.settings.defaultOutputPath = (0, import_obsidian.normalizePath)(value.trim());
         await this.plugin.saveSettings();
       })
     );
@@ -287,7 +297,7 @@ var NoteBundlerSettingTab = class extends import_obsidian.PluginSettingTab {
         await this.plugin.exportAllFilters();
       });
     });
-    containerEl.createEl("h3", { text: "Filters" });
+    new import_obsidian.Setting(containerEl).setName("Filters").setHeading();
     const addFilterSetting = new import_obsidian.Setting(containerEl).setName("Create new filter").setDesc("Filters are reusable rule groups for bundles.");
     addFilterSetting.addButton((button) => {
       button.setButtonText("+");
@@ -336,9 +346,6 @@ var NoteBundlerSettingTab = class extends import_obsidian.PluginSettingTab {
         });
       });
       const rulesContainer = filterContainer.createDiv({ cls: "note-bundler-filter-rules" });
-      rulesContainer.style.marginLeft = "16px";
-      rulesContainer.style.borderLeft = "1px solid var(--background-modifier-border)";
-      rulesContainer.style.paddingLeft = "12px";
       rulesContainer.createEl("div", { text: "Rules", cls: "note-bundler-filter-rules-title" });
       rulesContainer.createEl("div", {
         text: "Directory rules are vault-relative and apply recursively.",

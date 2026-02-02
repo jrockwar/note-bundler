@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 - 2026-02-02
+- **Plugin Guidelines Compliance**: Fixed all Obsidian plugin guideline violations.
+  - Removed hardcoded inline styling, added `styles.css` with CSS variables
+  - Added `normalizePath()` for user-defined output paths
+  - Changed to `setHeading()` for settings headings instead of HTML elements
+  - Removed debug console.log statements
+  - Switched to Vault API (`create`, `modify`, `createFolder`) instead of Adapter API for better performance and safety
+
 ## 0.1.1 - 2026-02-02
 - **Documentation**: Added settings screenshot to README.
 - **Documentation**: Cleaned up Development section, removed internal architecture notes.
