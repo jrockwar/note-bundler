@@ -51,8 +51,6 @@ export default class NoteBundlerPlugin extends Plugin {
   async onload() {
     console.log("Note Bundler: loading");
     await this.loadSettings();
-    
-    // Migrate old filter structure to new per-rule operators
     this.migrateFilterStructure();
 
     await this.updateAutoExportSchedule();
@@ -80,7 +78,8 @@ export default class NoteBundlerPlugin extends Plugin {
   async loadSettings() {
     const data = await this.loadData();
     const deviceId = this.getDeviceId();
-    const deviceData = data[deviceId] || data; // Fallback to old format
+    // Fallback to root data for backward compatibility with pre-device-ID settings
+    const deviceData = data[deviceId] || data;
     this.settings = Object.assign({}, DEFAULT_SETTINGS, deviceData);
   }
 
@@ -97,7 +96,8 @@ export default class NoteBundlerPlugin extends Plugin {
     const userAgent = navigator.userAgent || '';
     const timestamp = this.app.vault.adapter.basePath || '';
     
-    // Create a simple hash from device-specific info
+    // Create a hash from device-specific info
+    // Used for per-device settings
     const deviceString = `${platform}-${userAgent}-${timestamp}`;
     return btoa(deviceString).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
   }
@@ -117,6 +117,7 @@ export default class NoteBundlerPlugin extends Plugin {
 
     const intervalMs = Math.max(1, this.settings.autoExportFrequencyMinutes) * 60 * 1000;
     const lastRun = this.settings.lastRun ? Date.parse(this.settings.lastRun) : null;
+    // Run catch-up export immediately if interval has elapsed since last run
     if (!lastRun || Number.isNaN(lastRun) || Date.now() - lastRun >= intervalMs) {
       await this.exportAllFilters();
     }
@@ -125,12 +126,8 @@ export default class NoteBundlerPlugin extends Plugin {
     }, intervalMs);
   }
 
-  async exportAllBundles() {
-    // Placeholder: wiring for export pipeline will follow.
-    new Notice("Note Bundler: export not yet implemented");
-  }
-
   private sanitizeFilename(value: string) {
+    // Convert to lowercase, replace non-alphanumeric with hyphens, trim edges, cap at 80 chars
     return value
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
@@ -150,6 +147,7 @@ export default class NoteBundlerPlugin extends Plugin {
     }
 
     const cache = this.app.metadataCache.getCache(filePath);
+    // Extract tags from both inline tags (#tag) and frontmatter YAML
     const frontmatterTags = cache?.frontmatter?.tags;
     const frontmatterList = Array.isArray(frontmatterTags)
       ? frontmatterTags
@@ -160,9 +158,10 @@ export default class NoteBundlerPlugin extends Plugin {
       ...(cache?.tags ?? []).map((tag) => tag.tag),
       ...frontmatterList.map((tag) => (tag.startsWith("#") ? tag : `#${tag}`)),
     ];
+    // Store both original and normalized (lowercase, no #) for flexible matching
     const normalizedTags = tagValues.map((tag) => tag.replace(/^#/, "").toLowerCase());
 
-    // Evaluate rules sequentially using per-rule operators
+    // Evaluate rules sequentially: each rule's operator determines how it combines with previous results
     let result = this.evaluateRule(filter.rules[0], filePath, tagValues, normalizedTags);
     
     for (let i = 1; i < filter.rules.length; i++) {
@@ -188,6 +187,7 @@ export default class NoteBundlerPlugin extends Plugin {
       if (!normalizedValue) {
         return false;
       }
+      // Match exact directory or any file within it (recursive)
       const directoryHit = filePath === normalizedValue || filePath.startsWith(`${normalizedValue}/`);
       return rule.type === "directoryExclude" ? !directoryHit : directoryHit;
     }
@@ -196,9 +196,11 @@ export default class NoteBundlerPlugin extends Plugin {
     try {
       regex = new RegExp(rule.value, "i");
     } catch (error) {
+      // Silently fail on invalid regex patterns
       return false;
     }
 
+    // Test against both original tags (#tag) and normalized (tag) for flexibility
     const tagHit = tagValues.some((tag) => regex?.test(tag))
       || normalizedTags.some((tag) => regex?.test(tag));
     
@@ -209,31 +211,24 @@ export default class NoteBundlerPlugin extends Plugin {
   }
 
   private migrateFilterStructure() {
+    // Migrate filters from v0.0.2 (filter-level operator) to v0.0.3+ (per-rule operators)
     let needsSave = false;
     
     this.settings.filters.forEach((filter) => {
-      // Check if filter has old operator property (indicating old structure)
       if ('operator' in filter) {
         const oldFilter = filter as any;
-        
-        // Move operator to first rule if rules exist
         if (oldFilter.rules && oldFilter.rules.length > 0) {
           oldFilter.rules.forEach((rule: any, index: number) => {
             if (index === 0) {
-              // First rule gets the filter's operator, defaults to AND
               rule.operator = oldFilter.operator || "AND";
             } else {
-              // Subsequent rules default to AND
               rule.operator = rule.operator || "AND";
             }
           });
         }
-        
-        // Remove operator from filter
         delete (filter as any).operator;
         needsSave = true;
       } else {
-        // Ensure all rules have operators (for safety)
         filter.rules.forEach((rule, index) => {
           if (!rule.operator) {
             rule.operator = index === 0 ? "AND" : "AND";
@@ -249,6 +244,7 @@ export default class NoteBundlerPlugin extends Plugin {
   }
 
   async exportAllFilters() {
+    // Strip trailing slashes to avoid double-slash in output paths
     const outputFolder = this.settings.defaultOutputPath.replace(/[\\/]+$/, "");
     if (!outputFolder) {
       new Notice("Set a default output folder before exporting.");
@@ -272,6 +268,7 @@ export default class NoteBundlerPlugin extends Plugin {
 
     const files = this.app.vault.getMarkdownFiles();
     for (const filter of this.settings.filters) {
+      // Sort alphabetically by basename for consistent output ordering
       const matchingFiles = files
         .filter((file) => this.matchesFilter(file.path, filter))
         .sort((a, b) => a.basename.localeCompare(b.basename));
@@ -282,6 +279,7 @@ export default class NoteBundlerPlugin extends Plugin {
       for (const file of matchingFiles) {
         const content = await this.app.vault.read(file);
         const cache = this.app.metadataCache.getFileCache(file);
+        // Use frontmatter title if available, otherwise fall back to filename
         const noteTitle = (cache?.frontmatter?.title as string | undefined)?.trim() || file.basename;
         combinedParts.push(
           `---\n\n# Note title: ${noteTitle}\n\n${content.trim()}`
@@ -319,6 +317,7 @@ class NoteBundlerSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
+    // Generate unique IDs using timestamp + random hex for filter/rule identification
     const createId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const ruleTypeOptions: Record<FilterRuleType, string> = {
       tagRegexInclude: "Match tags by regex",
@@ -335,26 +334,24 @@ class NoteBundlerSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl("h2", { text: "Note Bundler Settings" });
 
-    let outputPathInput: { setValue: (value: string) => void } | null = null;
-    const outputPathSetting = new Setting(containerEl)
+    new Setting(containerEl)
       .setName("Default output folder")
       .setDesc(
         "Vault-relative path to export bundles (e.g., 'Exports/' or 'docs/bundles/')."
       )
-      .addText((text) => {
-        outputPathInput = text;
+      .addText((text) =>
         text
           .setPlaceholder("Exports/")
           .setValue(this.plugin.settings.defaultOutputPath)
           .onChange(async (value) => {
             this.plugin.settings.defaultOutputPath = value.trim();
             await this.plugin.saveSettings();
-          });
-      });
+          })
+      );
 
     new Setting(containerEl)
       .setName("Enable auto-export")
-      .setDesc("Turns on scheduled exports once scheduling is implemented.")
+      .setDesc("Automatically export filters at the specified frequency.")
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.autoExportEnabled)
@@ -481,7 +478,6 @@ class NoteBundlerSettingTab extends PluginSettingTab {
       filter.rules.forEach((rule, index) => {
         const ruleSetting = new Setting(rulesContainer);
         
-        // Add operator dropdown before the rule for rules after the first one
         if (index > 0) {
           ruleSetting
             .setName(`Rule ${index + 1}`)

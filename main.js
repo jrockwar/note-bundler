@@ -98,9 +98,6 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
       void this.exportAllFilters();
     }, intervalMs);
   }
-  async exportAllBundles() {
-    new import_obsidian.Notice("Note Bundler: export not yet implemented");
-  }
   sanitizeFilename(value) {
     return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80) || "filter";
   }
@@ -255,17 +252,15 @@ var NoteBundlerSettingTab = class extends import_obsidian.PluginSettingTab {
     const getRulePlaceholder = (ruleType) => ruleType === "directoryInclude" || ruleType === "directoryExclude" ? "Directory path (e.g., journals/)" : "Regex pattern";
     containerEl.empty();
     containerEl.createEl("h2", { text: "Note Bundler Settings" });
-    let outputPathInput = null;
-    const outputPathSetting = new import_obsidian.Setting(containerEl).setName("Default output folder").setDesc(
+    new import_obsidian.Setting(containerEl).setName("Default output folder").setDesc(
       "Vault-relative path to export bundles (e.g., 'Exports/' or 'docs/bundles/')."
-    ).addText((text) => {
-      outputPathInput = text;
-      text.setPlaceholder("Exports/").setValue(this.plugin.settings.defaultOutputPath).onChange(async (value) => {
+    ).addText(
+      (text) => text.setPlaceholder("Exports/").setValue(this.plugin.settings.defaultOutputPath).onChange(async (value) => {
         this.plugin.settings.defaultOutputPath = value.trim();
         await this.plugin.saveSettings();
-      });
-    });
-    new import_obsidian.Setting(containerEl).setName("Enable auto-export").setDesc("Turns on scheduled exports once scheduling is implemented.").addToggle(
+      })
+    );
+    new import_obsidian.Setting(containerEl).setName("Enable auto-export").setDesc("Automatically export filters at the specified frequency.").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.autoExportEnabled).onChange(async (value) => {
         this.plugin.settings.autoExportEnabled = value;
         await this.plugin.saveSettings();

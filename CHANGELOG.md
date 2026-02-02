@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.0 - 2026-02-02
+- **Publishing Release**: First public release ready for community distribution.
+- **Code Quality**: Removed LLM-generated patterns, added strategic comments for maintainability.
+- **Semver**: Moving from initial development (0.0.x) to functional pre-stable (0.x.0).
+
 ## 0.0.8 - 2026-01-31
 - **Bugfix**: Normalize output folder path to avoid double slashes in export paths.
 
