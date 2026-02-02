@@ -12,6 +12,8 @@ Export filtered Obsidian notes into consolidated Markdown files. Perfect for pre
 - Cross-platform compatibility
 - Device-specific settings (independent configs per device)
 
+![Note Bundler Settings](docs/settings.jpg)
+
 ## Installation
 
 1. Clone this repository
@@ -76,17 +78,7 @@ Each device maintains independent plugin settings automatically - no sync confli
 
 ## Development
 
-### Build Commands
-```bash
-npm run dev      # Dev build with watching
-npm run build    # Production build
-```
-
-### Architecture Notes
-- **Bundle Definition**: `{name, filters, ordering, outputPath, schedule, options}`
-- **Filter Evaluation**: Composable include/exclude logic before assembly
-- **Export Pipeline**: Collect → Sort → Concatenate → Write
-- **Cross-Platform**: Uses Obsidian Vault APIs for maximum compatibility
+Symlink the repo folder into `.obsidian/plugins/note-bundler` and run `npm run dev` for live development with hot reloading.
 
 ## Troubleshooting
 

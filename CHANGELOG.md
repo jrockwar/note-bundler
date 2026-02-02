@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 - 2026-02-02
+- **Documentation**: Added settings screenshot to README.
+- **Documentation**: Cleaned up Development section, removed internal architecture notes.
+
 ## 0.1.0 - 2026-02-02
 - **Publishing Release**: First public release ready for community distribution.
 - **Code Quality**: Removed LLM-generated patterns, added strategic comments for maintainability.
