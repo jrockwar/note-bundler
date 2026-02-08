@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 - 2026-02-08
+- **Documentation**: Updated settings screenshot to reflect latest UI.
+- **Release**: Version bump for documentation refresh.
+
 ## 0.1.2 - 2026-02-02
 - **Plugin Guidelines Compliance**: Fixed all Obsidian plugin guideline violations.
   - Removed hardcoded inline styling, added `styles.css` with CSS variables
