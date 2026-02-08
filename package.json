@@ -1,6 +1,6 @@
 {
   "name": "note-bundler",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Obsidian plugin to export bundles of notes as a single markdown file for LLM/AI context.",
   "main": "main.js",
   "scripts": {
