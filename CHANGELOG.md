@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 - 2026-02-09
+- **Review Fixes**: Adjusted command label, removed navigator usage, tightened types, and ensured awaited async migrations.
+- **Release**: Version bump for review feedback.
+
 ## 0.1.3 - 2026-02-08
 - **Documentation**: Updated settings screenshot to reflect latest UI.
 - **Release**: Version bump for documentation refresh.

@@ -41,12 +41,12 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
   }
   async onload() {
     await this.loadSettings();
-    this.migrateFilterStructure();
+    await this.migrateFilterStructure();
     await this.updateAutoExportSchedule();
     this.addSettingTab(new NoteBundlerSettingTab(this.app, this));
     this.addCommand({
       id: "open-settings",
-      name: "Open Note Bundler settings",
+      name: "Open settings",
       callback: () => {
         const settings = this.app.setting;
         settings.open();
@@ -71,9 +71,9 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
   }
   getDeviceId() {
     const platform = import_obsidian.Platform.isMobile ? "mobile" : "desktop";
-    const userAgent = navigator.userAgent || "";
+    const os = import_obsidian.Platform.isMacOS ? "mac" : import_obsidian.Platform.isWin ? "windows" : import_obsidian.Platform.isLinux ? "linux" : "unknown";
     const timestamp = this.app.vault.adapter.basePath || "";
-    const deviceString = `${platform}-${userAgent}-${timestamp}`;
+    const deviceString = `${platform}-${os}-${timestamp}`;
     return btoa(deviceString).replace(/[^a-zA-Z0-9]/g, "").slice(0, 16);
   }
   clearAutoExportSchedule() {
@@ -142,7 +142,7 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
     let regex = null;
     try {
       regex = new RegExp(rule.value, "i");
-    } catch (error) {
+    } catch {
       return false;
     }
     const tagHit = tagValues.some((tag) => regex?.test(tag)) || normalizedTags.some((tag) => regex?.test(tag));
@@ -151,7 +151,7 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
     }
     return tagHit;
   }
-  migrateFilterStructure() {
+  async migrateFilterStructure() {
     let needsSave = false;
     this.settings.filters.forEach((filter) => {
       if ("operator" in filter) {
@@ -165,7 +165,7 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
             }
           });
         }
-        delete filter.operator;
+        delete oldFilter.operator;
         needsSave = true;
       } else {
         filter.rules.forEach((rule, index) => {
@@ -177,7 +177,7 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
       }
     });
     if (needsSave) {
-      this.saveSettings();
+      await this.saveSettings();
     }
   }
   async exportAllFilters() {
@@ -198,7 +198,7 @@ var NoteBundlerPlugin = class extends import_obsidian.Plugin {
         new import_obsidian.Notice("Output path exists but is not a folder.");
         return;
       }
-    } catch (error) {
+    } catch {
       new import_obsidian.Notice("Failed to create output directory. Check path permissions.");
       return;
     }
@@ -228,21 +228,21 @@ ${content.trim()}`
       } catch (createError) {
         try {
           const existingFile = this.app.vault.getAbstractFileByPath(outputPath);
-          if (existingFile) {
+          if (existingFile instanceof import_obsidian.TFile) {
             await this.app.vault.modify(existingFile, output);
           } else {
             throw createError;
           }
         } catch (error) {
           new import_obsidian.Notice(`Failed to write export file: ${filename}`);
-          console.error("Note Bundler export error:", error);
+          console.error("Note bundler export error:", error);
         }
       }
     }
     this.settings.lastRun = (/* @__PURE__ */ new Date()).toISOString();
     await this.saveSettings();
     if (!this.settings.silentMode) {
-      new import_obsidian.Notice("Note Bundler: filters exported.");
+      new import_obsidian.Notice("Note bundler: filters exported.");
     }
   }
 };

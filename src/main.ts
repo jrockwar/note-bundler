@@ -1,4 +1,4 @@
-import { Notice, normalizePath, Platform, Plugin, PluginSettingTab, Setting, TFolder } from "obsidian";
+import { Notice, normalizePath, Platform, Plugin, PluginSettingTab, Setting, TFile, TFolder } from "obsidian";
 
 interface BundleDefinition {
   name: string;
@@ -44,13 +44,18 @@ const DEFAULT_SETTINGS: NoteBundlerSettings = {
   silentMode: false,
 };
 
+interface LegacyFilterDefinition extends FilterDefinition {
+  operator?: FilterOperator;
+  rules: Array<FilterRule & { operator?: FilterOperator }>;
+}
+
 export default class NoteBundlerPlugin extends Plugin {
   settings: NoteBundlerSettings = DEFAULT_SETTINGS;
   private autoExportIntervalId: number | null = null;
 
   async onload() {
     await this.loadSettings();
-    this.migrateFilterStructure();
+    await this.migrateFilterStructure();
 
     await this.updateAutoExportSchedule();
 
@@ -58,7 +63,7 @@ export default class NoteBundlerPlugin extends Plugin {
 
     this.addCommand({
       id: "open-settings",
-      name: "Open Note Bundler settings",
+      name: "Open settings",
       callback: () => {
         // Obsidian's typings omit app.setting, so we cast to reach the settings tab API.
         const settings = (this.app as unknown as { setting: { open: () => void; openTabById: (id: string) => void } }).setting;
@@ -90,13 +95,19 @@ export default class NoteBundlerPlugin extends Plugin {
 
   private getDeviceId(): string {
     // Create a unique device identifier using available platform info
-    const platform = Platform.isMobile ? 'mobile' : 'desktop';
-    const userAgent = navigator.userAgent || '';
+    const platform = Platform.isMobile ? "mobile" : "desktop";
+    const os = Platform.isMacOS
+      ? "mac"
+      : Platform.isWin
+        ? "windows"
+        : Platform.isLinux
+          ? "linux"
+          : "unknown";
     const timestamp = this.app.vault.adapter.basePath || '';
     
     // Create a hash from device-specific info
     // Used for per-device settings
-    const deviceString = `${platform}-${userAgent}-${timestamp}`;
+    const deviceString = `${platform}-${os}-${timestamp}`;
     return btoa(deviceString).replace(/[^a-zA-Z0-9]/g, '').slice(0, 16);
   }
 
@@ -193,7 +204,7 @@ export default class NoteBundlerPlugin extends Plugin {
     let regex: RegExp | null = null;
     try {
       regex = new RegExp(rule.value, "i");
-    } catch (error) {
+    } catch {
       // Silently fail on invalid regex patterns
       return false;
     }
@@ -208,15 +219,15 @@ export default class NoteBundlerPlugin extends Plugin {
     return tagHit;
   }
 
-  private migrateFilterStructure() {
+  private async migrateFilterStructure() {
     // Migrate filters from v0.0.2 (filter-level operator) to v0.0.3+ (per-rule operators)
     let needsSave = false;
     
     this.settings.filters.forEach((filter) => {
       if ('operator' in filter) {
-        const oldFilter = filter as any;
+        const oldFilter = filter as LegacyFilterDefinition;
         if (oldFilter.rules && oldFilter.rules.length > 0) {
-          oldFilter.rules.forEach((rule: any, index: number) => {
+          oldFilter.rules.forEach((rule, index) => {
             if (index === 0) {
               rule.operator = oldFilter.operator || "AND";
             } else {
@@ -224,7 +235,7 @@ export default class NoteBundlerPlugin extends Plugin {
             }
           });
         }
-        delete (filter as any).operator;
+        delete (oldFilter as LegacyFilterDefinition).operator;
         needsSave = true;
       } else {
         filter.rules.forEach((rule, index) => {
@@ -237,7 +248,7 @@ export default class NoteBundlerPlugin extends Plugin {
     });
     
     if (needsSave) {
-      this.saveSettings();
+      await this.saveSettings();
     }
   }
 
@@ -263,7 +274,7 @@ export default class NoteBundlerPlugin extends Plugin {
         new Notice("Output path exists but is not a folder.");
         return;
       }
-    } catch (error) {
+    } catch {
       new Notice("Failed to create output directory. Check path permissions.");
       return;
     }
@@ -298,14 +309,14 @@ export default class NoteBundlerPlugin extends Plugin {
         // File might already exist, try modifying it
         try {
           const existingFile = this.app.vault.getAbstractFileByPath(outputPath);
-          if (existingFile) {
-            await this.app.vault.modify(existingFile as any, output);
+          if (existingFile instanceof TFile) {
+            await this.app.vault.modify(existingFile, output);
           } else {
             throw createError;
           }
         } catch (error) {
           new Notice(`Failed to write export file: ${filename}`);
-          console.error("Note Bundler export error:", error);
+          console.error("Note bundler export error:", error);
         }
       }
     }
@@ -314,7 +325,7 @@ export default class NoteBundlerPlugin extends Plugin {
     await this.saveSettings();
 
     if (!this.settings.silentMode) {
-      new Notice("Note Bundler: filters exported.");
+      new Notice("Note bundler: filters exported.");
     }
   }
 }
