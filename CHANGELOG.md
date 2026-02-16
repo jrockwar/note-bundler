@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.5 - 2026-02-16
+- **Code Review Fix**: Removed unnecessary type assertion in migration code.
+
 ## 0.1.4 - 2026-02-09
 - **Review Fixes**: Adjusted command label, removed navigator usage, tightened types, and ensured awaited async migrations.
 - **Release**: Version bump for review feedback.

@@ -235,7 +235,7 @@ export default class NoteBundlerPlugin extends Plugin {
             }
           });
         }
-        delete (oldFilter as LegacyFilterDefinition).operator;
+        delete oldFilter.operator;
         needsSave = true;
       } else {
         filter.rules.forEach((rule, index) => {
